@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Log</title>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Inventory Log</h1>
+        <ul class="list-group">
+            {% for log in logs %}
+                <li class="list-group-item">{{ log['timestamp'] }} - {{ log['book_name'] }} - Quantity Change: {{ log['quantity_change'] }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>
