@@ -2,218 +2,125 @@ from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from datetime import datetime
-# import matplotlib.pyplot as plt
 from io import BytesIO
 import base64
+import pytz  # Add this import statement
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'  # SQLite database file
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-# Define Book and InventoryLog models
-class Book(db.Model):
+# Mendefinisikan model Buku dan LogPersediaan
+class Buku(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    author = db.Column(db.String(100), nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    stock = db.Column(db.Integer, nullable=False)
-    image = db.Column(db.String(255), nullable=False)
-    inventory_log = db.relationship('InventoryLog', backref='book', lazy=True, cascade="all, delete-orphan")
+    nama = db.Column(db.String(100), nullable=False)
+    penulis = db.Column(db.String(100), nullable=False)
+    deskripsi = db.Column(db.Text, nullable=False)
+    stok = db.Column(db.Integer, nullable=False)
+    gambar = db.Column(db.String(255), nullable=False)
+    log_persediaan = db.relationship('LogPersediaan', backref='buku', lazy=True, cascade="all, delete-orphan")
 
-class InventoryLog(db.Model):
+class LogPersediaan(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    quantity_change = db.Column(db.Integer, nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    book_id = db.Column(db.Integer, db.ForeignKey('book.id'), nullable=False)
+    perubahan_kuantitas = db.Column(db.Integer, nullable=False)
+    deskripsi = db.Column(db.Text, nullable=False)
+    
+    # Mengubah default ke fungsi yang mengembalikan waktu saat ini di zona waktu Jakarta
+    def default_timestamp(context):
+        jakarta_timezone = pytz.timezone('Asia/Jakarta')
+        return datetime.now(jakarta_timezone)
 
-# db.create_all()
+    timestamp = db.Column(db.DateTime, default=default_timestamp)
 
-# # Sample data for books and inventory logs
-# books = [
-#     {
-#         'id': 1,
-#         'name': 'Book 1',
-#         'author': 'Author 1',
-#         'description': 'Description for Book 1',
-#         'stock': 10,
-#         'image': 'book1.jpg',
-#         'inventory_log': []
-#     },
-#     {
-#         'id': 2,
-#         'name': 'Book 2',
-#         'author': 'Author 2',
-#         'description': 'Description for Book 2',
-#         'stock': 15,
-#         'image': 'book2.jpg',
-#         'inventory_log': []
-#     }
-# ]
+    id_buku = db.Column(db.Integer, db.ForeignKey('buku.id'), nullable=False)
 
-def get_inventory_levels():
-    inventory_levels = {}
-    for book in books:
-        inventory_levels[book['name']] = book['stock']
-    return inventory_levels
-
-# @app.route('/')
-# def home():
-#     return render_template('index.html', books=books)
+def dapatkan_tingkat_persediaan():
+    tingkat_persediaan = {}
+    for buku in buku_buku:
+        tingkat_persediaan[buku['nama']] = buku['stok']
+    return tingkat_persediaan
 
 @app.route('/')
-def home():
-    books = Book.query.all()
-    return render_template('index_bootstrap.html', books=books)
+def beranda():
+    buku_buku = Buku.query.all()
+    return render_template('index_bootstrap.html', buku_buku=buku_buku)
 
-@app.route('/book/<int:book_id>')
-def book_detail(book_id):
-    book = Book.query.get(book_id)
-    # book = next((b for b in books if b['id'] == book_id), None)
-    if book:
-        return render_template('book_detail.html', book=book)
-    return 'Book not found', 404
+@app.route('/buku/<int:id_buku>')
+def detail_buku(id_buku):
+    buku = Buku.query.get(id_buku)
+    if buku:
+        return render_template('detail_buku.html', buku=buku)
+    return 'Buku tidak ditemukan', 404
 
 # SQLite
-@app.route('/book/<int:book_id>/edit_inventory', methods=['GET', 'POST'])
-def edit_inventory(book_id):
-    book = Book.query.get(book_id)
+@app.route('/buku/<int:id_buku>/edit_persediaan', methods=['GET', 'POST'])
+def edit_persediaan(id_buku):
+    buku = Buku.query.get(id_buku)
     if request.method == 'POST':
-        quantity_change = int(request.form['quantity'])
-        description = request.form['description']
-        timestamp = datetime.utcnow()  # Use UTC time to match the default behavior in your model
+        perubahan_kuantitas = int(request.form['kuantitas'])
+        deskripsi = request.form['deskripsi']
+        
+        # Atur zona waktu ke Jakarta (GMT+7)
+        jakarta_timezone = pytz.timezone('Asia/Jakarta')
+        timestamp = datetime.now(jakarta_timezone)
 
-        # Update the database record
-        book.stock += quantity_change
-        db.session.add(InventoryLog(quantity_change=quantity_change, description=description, timestamp=timestamp, book=book))
+        # Memperbarui catatan database
+        buku.stok += perubahan_kuantitas
+        db.session.add(LogPersediaan(perubahan_kuantitas=perubahan_kuantitas, deskripsi=deskripsi, timestamp=timestamp, buku=buku))
         db.session.commit()
 
-        return redirect(url_for('book_detail', book_id=book_id))
-    return render_template('edit_inventory.html', book=book)
+        return redirect(url_for('detail_buku', id_buku=id_buku))
+    return render_template('edit_persediaan.html', buku=buku)
 
-
-# # Previous
-# @app.route('/book/<int:book_id>/edit_inventory', methods=['GET', 'POST'])
-# def edit_inventory(book_id):
-#     book = Book.query.get(book_id)
-#     # book = next((b for b in books if b['id'] == book_id), None)
-#     if request.method == 'POST':
-#         quantity_change = int(request.form['quantity'])
-#         description = request.form['description']
-#         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-#         book['stock'] += quantity_change
-#         book['inventory_log'].append({'quantity_change': quantity_change, 'description': description, 'timestamp': timestamp})
-#         return redirect(url_for('book_detail', book_id=book_id))
-#     return render_template('edit_inventory.html', book=book)
-
-@app.route('/inventory_log')
-def inventory_log():
-    all_logs = []
-    for book in books:
-        for log in book['inventory_log']:
-            all_logs.append({'book_name': book['name'], 'quantity_change': log['quantity_change'], 'description': log['description'], 'timestamp': log['timestamp']})
-    all_logs.sort(key=lambda x: x['timestamp'], reverse=True)
-    return render_template('inventory_log.html', logs=all_logs)
+@app.route('/log_persediaan')
+def log_persediaan():
+    semua_log = []
+    for buku in buku_buku:
+        for log in buku['log_persediaan']:
+            semua_log.append({'nama_buku': buku['nama'], 'perubahan_kuantitas': log['perubahan_kuantitas'], 'deskripsi': log['deskripsi'], 'timestamp': log['timestamp']})
+    semua_log.sort(key=lambda x: x['timestamp'], reverse=True)
+    return render_template('log_persediaan.html', logs=semua_log)
 
 # SQLite
-@app.route('/add_book', methods=['GET', 'POST'])
-def add_book():
+@app.route('/tambah_buku', methods=['GET', 'POST'])
+def tambah_buku():
     if request.method == 'POST':
-        new_book = Book(
-            name=request.form['name'],
-            author=request.form['author'],
-            description=request.form['description'],
-            stock=int(request.form['stock']),
-            image=request.form['image']
+        buku_baru = Buku(
+            nama=request.form['nama'],
+            penulis=request.form['penulis'],
+            deskripsi=request.form['deskripsi'],
+            stok=int(request.form['stok']),
+            gambar=request.form['gambar']
         )
-        db.session.add(new_book)
+        db.session.add(buku_baru)
         db.session.commit()
-        return redirect(url_for('home'))
-    return render_template('add_book.html')
+        return redirect(url_for('beranda'))
+    return render_template('tambah_buku.html')
 
-# # Previous
-# @app.route('/add_book', methods=['GET', 'POST'])
-# def add_book():
-#     if request.method == 'POST':
-#         new_book = {
-#             'id': len(books) + 1,
-#             'name': request.form['name'],
-#             'author': request.form['author'],
-#             'description': request.form['description'],
-#             'stock': int(request.form['stock']),
-#             'image': request.form['image'],
-#             'inventory_log': []
-#         }
-#         books.append(new_book)
-#         return redirect(url_for('home'))
-#     return render_template('add_book.html')
-
-@app.route('/edit_book/<int:book_id>', methods=['GET', 'POST'])
-def edit_book(book_id):
-    book = Book.query.get(book_id)
+@app.route('/edit_buku/<int:id_buku>', methods=['GET', 'POST'])
+def edit_buku(id_buku):
+    buku = Buku.query.get(id_buku)
     if request.method == 'POST':
-        book.name = request.form['name']
-        book.author = request.form['author']
-        book.description = request.form['description']
-        book.stock = int(request.form['stock'])
-        book.image = request.form['image']
+        buku.nama = request.form['nama']
+        buku.penulis = request.form['penulis']
+        buku.deskripsi = request.form['deskripsi']
+        buku.stok = int(request.form['stok'])
+        buku.gambar = request.form['gambar']
         db.session.commit()
-        return redirect(url_for('book_detail', book_id=book_id))
-    return render_template('edit_book.html', book=book)
+        return redirect(url_for('detail_buku', id_buku=id_buku))
+    return render_template('edit_buku.html', buku=buku)
 
-# # Previous
-# @app.route('/edit_book/<int:book_id>', methods=['GET', 'POST'])
-# def edit_book(book_id):
-#     book = next((b for b in books if b['id'] == book_id), None)
-#     if request.method == 'POST':
-#         book['name'] = request.form['name']
-#         book['author'] = request.form['author']
-#         book['description'] = request.form['description']
-#         book['stock'] = int(request.form['stock'])
-#         book['image'] = request.form['image']
-#         return redirect(url_for('book_detail', book_id=book_id))
-#     return render_template('edit_book.html', book=book)
+@app.route('/hapus_buku/<int:id_buku>')
+def hapus_buku(id_buku):
+    buku = Buku.query.get(id_buku)
+    if buku:
+        # Menghapus log terkait
+        LogPersediaan.query.filter_by(id_buku=buku.id).delete()
 
-@app.route('/delete_book/<int:book_id>')
-def delete_book(book_id):
-    book = Book.query.get(book_id)
-    if book:
-        # Delete associated logs
-        InventoryLog.query.filter_by(book_id=book.id).delete()
-
-        db.session.delete(book)
+        db.session.delete(buku)
         db.session.commit()
-    return redirect(url_for('home'))
-
-# # Previous
-# @app.route('/delete_book/<int:book_id>')
-# def delete_book(book_id):
-#     global books
-#     books = [book for book in books if book['id'] != book_id]
-#     return redirect(url_for('home'))
-
-# @app.route('/levels')
-# def inventory_levels():
-#     inventory_levels_data = get_inventory_levels()
-    
-#     plt.figure(figsize=(8, 6))
-#     plt.bar(inventory_levels_data.keys(), inventory_levels_data.values(), color='blue')
-#     plt.title('Inventory Levels')
-#     plt.xlabel('Books')
-#     plt.ylabel('Stock')
-#     plt.xticks(rotation=45, ha='right')
-    
-#     # Save the plot to a BytesIO object
-#     image_stream = BytesIO()
-#     plt.savefig(image_stream, format='png')
-#     image_stream.seek(0)
-    
-#     # Encode the plot as base64 for embedding in HTML
-#     image_base64 = base64.b64encode(image_stream.read()).decode('utf-8')
-    
-#     return render_template('inventory_levels.html', image_base64=image_base64)
+    return redirect(url_for('beranda'))
 
 if __name__ == '__main__':
-    # db.create_all()
     app.run(debug=True)

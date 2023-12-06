@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log Persediaan</title>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Log Persediaan</h1>
+        <ul class="list-group">
+            {% for log in logs %}
+                <li class="list-group-item">{{ log['timestamp'] }} - {{ log['nama_buku'] }} - Perubahan Kuantitas: {{ log['perubahan_kuantitas'] }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+</body>
+</html>

@@ -1,0 +1,21 @@
+python -m venv venv
+
+# Set the execution policy to unrestricted for the current session
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+
+.\venv\Scripts\Activate
+
+pip install Flask Flask-SQLAlchemy
+
+pip install Flask-Migrate
+
+flask db init
+
+flask db migrate -m "Initial migration"
+
+flask db upgrade
+
+---------
+
+python -m flask db init
+
